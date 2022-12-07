@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/joho/godotenv"
 	"log"
-	"net"
 	"os"
 )
 
@@ -30,37 +28,24 @@ func init() {
 }
 
 func main() {
-	conn, _ := net.Dial("tcp", address)
-
-	_, err := fmt.Fprintf(conn, "go client connect")
-	if err != nil {
-		return
-	}
-
 	defer handlePanic()
 
-	for {
-		funcName(conn)
+	client, err := NewClient(address)
 
-		handleResponse(conn)
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		format := "go clietn connect"
+		client.SendMsgToServer(format)
+
+		client.HandleResponse()
 	}
 }
 
 func handlePanic() {
 	if r := recover(); r != nil {
 		fmt.Println(r)
-	}
-}
-
-func handleResponse(conn net.Conn) {
-	message, _ := bufio.NewReader(conn).ReadString('\n')
-	fmt.Print("Message from server: " + message)
-}
-
-func funcName(conn net.Conn) {
-	format := "go clietn connect"
-	_, err := fmt.Fprintf(conn, format)
-	if err != nil {
-		panic(err)
 	}
 }
