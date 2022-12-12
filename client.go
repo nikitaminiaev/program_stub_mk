@@ -4,11 +4,16 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log"
 	"net"
+	"stubMk/controller"
 )
 
 type Client struct {
-	conn net.Conn
+	conn         net.Conn
+	fromServerCh chan string
+	toServerCh   chan string
+	controller   controller.MkController
 }
 
 func NewClient(address string) (Client, error) {
@@ -22,18 +27,29 @@ func NewClient(address string) (Client, error) {
 		return Client{}, errors.New("connection is not established")
 	}
 
+	fromServerCh := make(chan string)
+	toServerCh := make(chan string)
 	return Client{
-		conn: conn,
+		conn:         conn,
+		fromServerCh: fromServerCh,
+		toServerCh:   toServerCh,
+		controller:   controller.NewController(fromServerCh, toServerCh),
 	}, nil
 }
 
 func (c *Client) HandleResponse() {
-	message, _ := bufio.NewReader(c.conn).ReadString('\n')
-	fmt.Print("Message from server: " + message)
+	message, err := bufio.NewReader(c.conn).ReadString('\n')
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	go c.controller.ProcessData()
+	c.fromServerCh <- message
 }
 
-func (c *Client) SendMsgToServer(msg string) {
-	_, err := fmt.Fprintf(c.conn, msg)
+func (c *Client) SendMsgToServer() {
+	_, err := fmt.Fprintf(c.conn, <-c.fromServerCh)
 	if err != nil {
 		err := c.conn.Close()
 		if err != nil {
