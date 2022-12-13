@@ -34,6 +34,10 @@ func NewController(inputCh chan string, outputCh chan string) MkController {
 	}
 }
 
+func (c *MkController) SetZ(z uint16) {
+	c.zCurrent = z
+}
+
 func (c *MkController) ProcessData() {
 	data, open := <-c.inputCh
 
@@ -63,11 +67,11 @@ func (c *MkController) ProcessData() {
 	}
 
 	var valueUint uint16
-	if val, ok := value.(string); ok {
-		v, _ := strconv.ParseUint(val, 16, 16)
-		valueUint = uint16(v)
-	} else if val, ok := value.(float64); ok {
-		valueUint = uint16(val)
+	if srt, ok := value.(string); ok {
+		temp, _ := strconv.ParseUint(srt, 16, 16)
+		valueUint = uint16(temp)
+	} else if float, ok := value.(float64); ok {
+		valueUint = uint16(float)
 	} else {
 		log.Fatal("value not exist")
 		return
@@ -87,11 +91,22 @@ func (c *MkController) ProcessData() {
 }
 
 func (c *MkController) scanAlgorithmZ() {
-	for z := c.zCurrent; z == 0; z-- {
+	for z := c.zCurrent; z > 0; z-- {
 		if z == c.Surface[c.yCurrent][c.xCurrent] {
 			c.zCurrent = z + departureByZ
-			c.outputCh <- fmt.Sprintf("{{\"sensor\": \"surface\", \"z_val\": %d}}", z)
-			break
+			c.outputCh <- fmt.Sprintf(`{"sensor": "surface", "z_val": %d}`, z)
+			return
+		}
+	}
+
+	c.zCurrent = departureByZ
+	c.outputCh <- fmt.Sprintf(`{"sensor": "surface", "z_val": 0}`)
+}
+
+func (c *MkController) GenSurface(height uint16) {
+	for x, column := range c.Surface {
+		for y := range column {
+			c.Surface[x][y] = height
 		}
 	}
 }

@@ -52,9 +52,8 @@ func main() {
 	}
 
 	for {
-		client.SendMsgToServer()
-
 		client.HandleResponse()
+		client.SendMsgToServer()
 	}
 }
 
