@@ -29,27 +29,33 @@ func NewClient(address string) (Client, error) {
 
 	fromServerCh := make(chan string)
 	toServerCh := make(chan string)
+	newController := controller.NewController(fromServerCh, toServerCh)
+	newController.GenSurface(11)
+
 	return Client{
 		conn:         conn,
 		fromServerCh: fromServerCh,
 		toServerCh:   toServerCh,
-		controller:   controller.NewController(fromServerCh, toServerCh),
+		controller:   newController,
 	}, nil
 }
 
 func (c *Client) HandleResponse() {
 	message, err := bufio.NewReader(c.conn).ReadString('\n')
-
+	fmt.Println(err)
+	fmt.Println(message)
 	if err != nil {
 		log.Println(err)
 	}
 
+	fmt.Println(message)
 	go c.controller.ProcessData()
 	c.fromServerCh <- message
 }
 
 func (c *Client) SendMsgToServer() {
-	_, err := fmt.Fprintf(c.conn, <-c.fromServerCh)
+	fmt.Println("SendMsgToServer")
+	_, err := fmt.Fprintf(c.conn, <-c.toServerCh)
 	if err != nil {
 		err := c.conn.Close()
 		if err != nil {
