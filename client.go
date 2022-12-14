@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"stubMk/controller"
 )
 
@@ -30,7 +31,7 @@ func NewClient(address string) (Client, error) {
 	fromServerCh := make(chan string)
 	toServerCh := make(chan string)
 	newController := controller.NewController(fromServerCh, toServerCh)
-	newController.GenSurface(11)
+	newController.SurfaceGenerator.GenSurface(11)
 
 	return Client{
 		conn:         conn,
@@ -42,20 +43,23 @@ func NewClient(address string) (Client, error) {
 
 func (c *Client) HandleResponse() {
 	message, err := bufio.NewReader(c.conn).ReadString('\n')
-	fmt.Println(err)
-	fmt.Println(message)
+	if strings.HasPrefix(message, "connected") {
+		fmt.Println(message)
+		message = string([]rune(message)[9:])
+		return
+	}
+
 	if err != nil {
 		log.Println(err)
 	}
 
-	fmt.Println(message)
 	go c.controller.ProcessData()
 	c.fromServerCh <- message
 }
 
 func (c *Client) SendMsgToServer() {
-	fmt.Println("SendMsgToServer")
-	_, err := fmt.Fprintf(c.conn, <-c.toServerCh)
+	msg := <-c.toServerCh
+	_, err := fmt.Fprintf(c.conn, msg)
 	if err != nil {
 		err := c.conn.Close()
 		if err != nil {
