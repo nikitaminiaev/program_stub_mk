@@ -44,16 +44,22 @@ func NewClient(address string) (Client, error) {
 func (c *Client) HandleResponse() {
 	message, err := bufio.NewReader(c.conn).ReadString('\n')
 	if strings.HasPrefix(message, "connected") {
-		fmt.Println(message)
 		message = string([]rune(message)[9:])
 		return
 	}
 
 	if err != nil {
 		log.Println(err)
+		panic(err)
 	}
 
-	go c.controller.ProcessData()
+	go func() {
+		err := c.controller.ProcessData()
+		if err != nil {
+			log.Println(err)
+			panic(err)
+		}
+	}()
 	c.fromServerCh <- message
 }
 
@@ -63,8 +69,10 @@ func (c *Client) SendMsgToServer() {
 	if err != nil {
 		err := c.conn.Close()
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			return
 		}
-		panic(err)
+		log.Println(err)
+		return
 	}
 }

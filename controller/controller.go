@@ -2,8 +2,8 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"strconv"
 )
 
@@ -48,32 +48,62 @@ func (c *MkController) GetZ() uint16 {
 	return c.zCurrent
 }
 
-func (c *MkController) ProcessData() {
+func (c *MkController) ProcessData() error {
+	sensor, valueUint, ParamErr := c.getParam()
+
+	if ParamErr != nil {
+		return ParamErr
+	}
+
+	var err error
+	switch sensor {
+	case "servo_x":
+		c.xCurrent = valueUint
+		err = c.scanAlgorithmZ()
+	case "servo_y":
+		c.yCurrent = valueUint
+		err = c.scanAlgorithmZ()
+	case "servo_z":
+		c.zCurrent = valueUint
+		err = c.scanAlgorithmZ()
+	default:
+		err = errors.New("unknown sensor name")
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *MkController) getParam() (string, uint16, error) {
 	data, open := <-c.inputCh
 
 	if !open {
-		return
+		return "", 0, errors.New("input channel is closed")
 	}
 
 	var dataMap map[string]any
-	err := json.Unmarshal([]byte(data), &dataMap)
-	if err != nil {
-		log.Fatal(err)
-
-		return
+	parsErr := json.Unmarshal([]byte(data), &dataMap)
+	if parsErr != nil {
+		return "", 0, parsErr
 	}
 
 	sensor, exists := dataMap["sensor"]
 	if !exists {
-		log.Fatal("sensor not exist")
-
-		return
+		return "", 0, errors.New("sensor not exist")
+	}
+	sensorStr := ""
+	if str, ok := sensor.(string); ok {
+		sensorStr = str
+	} else {
+		return "", 0, errors.New("sensor in not string")
 	}
 
 	value, exists := dataMap["value"]
 	if !exists {
-		log.Fatal("value not exist")
-		return
+		return "", 0, errors.New("value not exist")
 	}
 
 	var valueUint uint16
@@ -83,32 +113,25 @@ func (c *MkController) ProcessData() {
 	} else if float, ok := value.(float64); ok {
 		valueUint = uint16(float)
 	} else {
-		log.Fatal("value type is not wrong")
-		return
+		return "", 0, errors.New("value type is not wrong")
 	}
-
-	switch sensor {
-	case "servo_x":
-		c.xCurrent = valueUint
-		c.scanAlgorithmZ()
-	case "servo_y":
-		c.yCurrent = valueUint
-		c.scanAlgorithmZ()
-	case "servo_z":
-		c.zCurrent = valueUint + 10
-		c.scanAlgorithmZ()
-	}
+	return sensorStr, valueUint, nil
 }
 
-func (c *MkController) scanAlgorithmZ() {
+func (c *MkController) scanAlgorithmZ() error {
+	if c.yCurrent > surfaceSize || c.xCurrent > surfaceSize {
+		return errors.New("coordinate > surfaceSize")
+	}
+
 	for z := c.zCurrent; z > 0; z-- {
 		if z == c.SurfaceGenerator.Surface[c.yCurrent][c.xCurrent] {
 			c.zCurrent = z + departureByZ
 			c.outputCh <- fmt.Sprintf(`{"sensor": "surface", "z_val": %d}`, z)
-			return
+			return nil
 		}
 	}
 
 	c.zCurrent = departureByZ
 	c.outputCh <- fmt.Sprintf(`{"sensor": "surface", "z_val": 0}`)
+	return nil
 }
