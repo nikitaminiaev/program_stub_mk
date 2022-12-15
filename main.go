@@ -5,6 +5,7 @@ import (
 	"github.com/joho/godotenv"
 	"log"
 	"os"
+	"time"
 )
 
 var address string
@@ -50,11 +51,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
+	var seconds float64
 	for {
+		start := time.Now()
+		duration := time.Since(start)
+
 		go client.SendMsgToServer()
 
 		client.HandleResponse()
+
+		seconds += duration.Seconds()
+		fmt.Println(seconds)
 	}
 }
 
